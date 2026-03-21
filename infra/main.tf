@@ -18,10 +18,12 @@ module "networking" {
 
 }
 
-# module "compute" {
-#   source = "./modules/compute"
-#   vpc_id = module.networking.vpc_id
-#   private_subnet_id_1 = module.networking.private_subnet_id_1
-#   private_subnet_id_2 = module.networking.private_subnet_id_2
-#   project_name = var.project_name
-# }
+module "compute" {
+  source              = "./modules/compute"
+  vpc_id              = module.networking.vpc_id
+  private_subnet_id_1 = module.networking.private_subnet_id_1
+  private_subnet_id_2 = module.networking.private_subnet_id_2
+  public_subnet_id    = module.networking.public_subnet_1
+  public_subnet_id_2  = module.networking.public_subnet_2
+  project_name        = var.project_name
+}

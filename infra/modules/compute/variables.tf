@@ -13,6 +13,16 @@ variable "private_subnet_id_2" {
   type = string
 
 }
+variable "public_subnet_id" {
+  description = "ID of the public subnet"
+  type = string
+
+}
+variable "public_subnet_id_2" {
+  description = "ID of the second public subnet"
+  type = string
+
+}
 
 variable "project_name" {
   description = "Name of the project"
