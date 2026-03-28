@@ -1,3 +1,4 @@
+# Inputs passed from the root module (infra/main.tf)
 
 variable "vpc_cidr" {
   type = string

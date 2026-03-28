@@ -1,3 +1,9 @@
+# Networking module - creates the VPC, subnets, gateways, and route tables.
+# Traffic flow:
+#   Internet -> IGW -> Public subnets (ALB) -> NAT GW -> Private subnets (ECS tasks)
+
+# VPC - isolated virtual network containing all resources.
+# DNS enabled so ECS/ECR can resolve each other by hostname.
 resource "aws_vpc" "main" {
   cidr_block = var.vpc_cidr
   enable_dns_support   = true
@@ -7,12 +13,16 @@ resource "aws_vpc" "main" {
   }
 }
 
+# Internet Gateway - gives public subnets a route to the internet
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
   tags = {
     Name = "my-igw"
   }
 }
+
+# Public subnets (2 AZs) - ALB and NAT Gateway live here.
+# map_public_ip_on_launch = true assigns public IPs automatically.
 resource "aws_subnet" "public_subnet_1" {
     vpc_id = aws_vpc.main.id
     cidr_block = "10.0.1.0/24"
@@ -33,6 +43,8 @@ resource "aws_subnet" "public_subnet_2" {
     }
 }
 
+# Private subnets (2 AZs) - ECS Fargate tasks run here.
+# No public IPs; outbound internet access goes through NAT Gateway.
 resource "aws_subnet" "private_subnet_1" {
     vpc_id = aws_vpc.main.id
     cidr_block = "10.0.3.0/24"
@@ -53,6 +65,7 @@ resource "aws_subnet" "private_subnet_2" {
     }
 }
 
+# Public route table - sends all outbound traffic (0.0.0.0/0) to the IGW
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
   route {
@@ -74,6 +87,7 @@ resource "aws_route_table_association" "public_subnet_2" {
   route_table_id = aws_route_table.public.id
 }
 
+# Private route table - outbound traffic routed through NAT Gateway (added below)
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
   tags = {
@@ -91,6 +105,9 @@ resource "aws_route_table_association" "private_subnet_2" {
   route_table_id = aws_route_table.private.id
 }
 
+# Elastic IP + NAT Gateway - allows private subnets to reach the internet
+# outbound (e.g., pulling Docker images) without being publicly accessible.
+# NAT GW sits in a public subnet and needs the IGW to exist first.
 resource "aws_eip" "cloud_suite_eip" {
   domain = "vpc"
 
@@ -110,6 +127,7 @@ resource "aws_nat_gateway" "main_nat_gw" {
   depends_on = [aws_internet_gateway.igw]
 }
 
+# Default route for private subnets -> NAT Gateway
 resource "aws_route" "nat_route" {
   route_table_id = aws_route_table.private.id
   destination_cidr_block = "0.0.0.0/0"

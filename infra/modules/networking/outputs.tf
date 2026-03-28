@@ -1,3 +1,6 @@
+# Outputs consumed by the compute module via the root module.
+# Networking outputs -> root main.tf -> compute module inputs.
+
 output "vpc_id" {
   description = "This is the ID for the vpc"
   value = aws_vpc.main.id
