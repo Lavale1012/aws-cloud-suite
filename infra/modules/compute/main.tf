@@ -18,14 +18,14 @@ resource "aws_ecr_repository" "ecr_repo" {
 resource "aws_iam_role" "ecs_task_execution_role" {
   name = "${var.project_name}_ecs_task_execution_role"
   assume_role_policy = jsonencode({
-    version = "2012-10-17"
-    statement = [
+    Version = "2012-10-17"
+    Statement = [
       {
-        effect = "Allow"
-        principal = {
-          service = "ecs-tasks.amazonaws.com"
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
         }
-        action = "sts:AssumeRole"
+        Action = "sts:AssumeRole"
       }
     ]
 

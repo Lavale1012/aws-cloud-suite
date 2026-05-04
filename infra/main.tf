@@ -16,8 +16,8 @@ provider "aws" {
 
 # Creates VPC, subnets, IGW, NAT gateway, and route tables
 module "networking" {
-  source = "./modules/networking"
-  vpc_cidr = var.vpc_cidr
+  source       = "./modules/networking"
+  vpc_cidr     = var.vpc_cidr
   project_name = var.project_name
 
 }
@@ -30,6 +30,17 @@ module "compute" {
   private_subnet_id_1 = module.networking.private_subnet_1
   private_subnet_id_2 = module.networking.private_subnet_2
   public_subnet_id    = module.networking.public_subnet_1
-  public_subnet_id_2  = module.networking.private_subnet_2
+  public_subnet_id_2  = module.networking.public_subnet_2
   project_name        = var.project_name
+}
+
+module "database" {
+  source             = "./modules/database"
+  vpc_id             = module.networking.vpc_id
+  private_subnet_1   = module.networking.private_subnet_1
+  private_subnet_2   = module.networking.private_subnet_2
+  ecs_security_group = module.compute.ecs_security_group_id
+  project_name       = var.project_name
+  db_username        = var.db_username
+  db_password        = var.db_password
 }
