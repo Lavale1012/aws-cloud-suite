@@ -8,7 +8,15 @@ terraform {
       version = "~> 6.0"
     }
   }
+  backend "s3" {
+    bucket         = "cloud-suite-terraform-state"
+    key            = "terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "cloud-suite-terraform-locks"
+    encrypt        = true
+  }
 }
+
 
 provider "aws" {
   region = var.aws_region
@@ -43,4 +51,14 @@ module "database" {
   project_name       = var.project_name
   db_username        = var.db_username
   db_password        = var.db_password
+}
+
+module "monitoring" {
+  source                 = "./modules/monitoring"
+  project_name           = var.project_name
+  ecs_cluster_name       = module.compute.ecs_cluster_name
+  ecs_service_name       = module.compute.ecs_service_name
+  alb_arn_suffix         = module.compute.alb_arn_suffix
+  db_instance_identifier = module.database.db_identifier
+  notification_email     = var.notification_email
 }

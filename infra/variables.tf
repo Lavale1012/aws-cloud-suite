@@ -30,3 +30,9 @@ variable "db_password" {
   sensitive   = true
   description = "Database password"
 }
+
+variable "notification_email" {
+  type        = string
+  description = "Email for SNS"
+  sensitive   = true
+}
