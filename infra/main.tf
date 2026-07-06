@@ -40,6 +40,10 @@ module "compute" {
   public_subnet_id    = module.networking.public_subnet_1
   public_subnet_id_2  = module.networking.public_subnet_2
   project_name        = var.project_name
+  jwt_secret          = var.jwt_secret
+  redis_addr          = module.redis.redis_addr
+  db_username         = var.db_username
+  db_password         = var.db_password
 }
 
 module "database" {
@@ -51,6 +55,29 @@ module "database" {
   project_name       = var.project_name
   db_username        = var.db_username
   db_password        = var.db_password
+}
+
+# ElastiCache Redis for the API's cross-instance rate limiter.
+# NOTE: this module intentionally does NOT take the ECS security group, so it has
+# no dependency on the compute module (compute consumes redis.redis_addr below).
+# The ECS→Redis ingress allowance is added as a standalone rule after both exist.
+module "redis" {
+  source           = "./modules/redis"
+  vpc_id           = module.networking.vpc_id
+  private_subnet_1 = module.networking.private_subnet_1
+  private_subnet_2 = module.networking.private_subnet_2
+  project_name     = var.project_name
+}
+
+# Allow the ECS tasks to reach Redis on 6379. Declared at the root so it can
+# reference both module security groups without creating a compute<->redis cycle.
+resource "aws_security_group_rule" "ecs_to_redis" {
+  type                     = "ingress"
+  from_port                = 6379
+  to_port                  = 6379
+  protocol                 = "tcp"
+  security_group_id        = module.redis.redis_security_group_id
+  source_security_group_id = module.compute.ecs_security_group_id
 }
 
 module "monitoring" {

@@ -36,3 +36,9 @@ variable "notification_email" {
   description = "Email for SNS"
   sensitive   = true
 }
+
+variable "jwt_secret" {
+  type        = string
+  sensitive   = true
+  description = "JWT secret for Nimbus API"
+}
