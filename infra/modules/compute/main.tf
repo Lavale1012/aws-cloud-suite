@@ -9,7 +9,7 @@ resource "aws_ecs_cluster" "cloud_suite_ecs_cluster" {
 
 # ECR - Docker image registry. ECS pulls the container image from here.
 resource "aws_ecr_repository" "ecr_repo" {
-  name = "${var.project_name}-api"
+  name                 = "${var.project_name}-api"
   image_tag_mutability = "MUTABLE"
 }
 
@@ -38,6 +38,11 @@ resource "aws_iam_role_policy_attachment" "ecs_task_execution_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+resource "aws_iam_role_policy_attachment" "ecs_s3_policy" {
+  role       = aws_iam_role.ecs_task_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
+
 # Task definition - container blueprint: 0.25 vCPU, 512MB RAM, port 8080.
 # awsvpc mode gives each task its own network interface (required for Fargate).
 resource "aws_ecs_task_definition" "api" {
@@ -47,6 +52,7 @@ resource "aws_ecs_task_definition" "api" {
   cpu                      = "256"
   memory                   = "512"
   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+
 
   container_definitions = jsonencode([{
     name      = "${var.project_name}_api"
@@ -64,12 +70,20 @@ resource "aws_ecs_task_definition" "api" {
         awslogs-stream-prefix = "ecs"
       }
     }
+    environment = [
+      { name = "PORT", value = "8080" },
+      { name = "AWS_REGION", value = "us-east-1" },
+      { name = "S3_BUCKET", value = "nimbus-cli-storage" },
+      { name = "JWT_SECRET", value = var.jwt_secret },
+      { name = "REDIS_ADDR", value = var.redis_addr },
+      { name = "DATABASE_URL", value = "host=cloud-suite-db-instance.c4jeeky2it7l.us-east-1.rds.amazonaws.com user=${var.db_username} password=${var.db_password} dbname=cloudsuitedb port=5432 sslmode=require" }
+    ]
   }])
 }
 
 # CloudWatch log group - stores container stdout/stderr, 7-day retention
 resource "aws_cloudwatch_log_group" "cloud_suite_cloudwatch_log_group" {
-  name = "/ecs/${var.project_name}_api"
+  name              = "/ecs/${var.project_name}_api"
   retention_in_days = 7
 }
 
@@ -78,21 +92,21 @@ resource "aws_cloudwatch_log_group" "cloud_suite_cloudwatch_log_group" {
 
 # ECS SG - only accepts traffic on 8080 from the ALB security group
 resource "aws_security_group" "ecs_security_group" {
-  name = "${var.project_name}_ecs_security_group"
-  vpc_id = var.vpc_id
+  name        = "${var.project_name}_ecs_security_group"
+  vpc_id      = var.vpc_id
   description = "This is the security group for ECS containers"
   ingress {
-    from_port   = 8080
-    to_port     = 8080
-    protocol    = "tcp"
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
     security_groups = [aws_security_group.alb_security_group.id]
 
   }
 
   egress {
-    from_port = 0
-    to_port = 0
-    protocol = "-1"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
   tags = {
@@ -102,8 +116,8 @@ resource "aws_security_group" "ecs_security_group" {
 
 # ALB SG - accepts HTTP (port 80) from anywhere on the internet
 resource "aws_security_group" "alb_security_group" {
-  name = "${var.project_name}_alb_security_group"
-  vpc_id = var.vpc_id
+  name        = "${var.project_name}_alb_security_group"
+  vpc_id      = var.vpc_id
   description = "This is the security group for ALB"
   ingress {
     from_port   = 80
@@ -112,9 +126,9 @@ resource "aws_security_group" "alb_security_group" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   egress {
-    from_port = 0
-    to_port = 0
-    protocol = "-1"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
   tags = {
@@ -145,6 +159,12 @@ resource "aws_lb_target_group" "cloud_suite_lb_tg" {
   port        = 8080
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
+  health_check {
+    path                = "/health"
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    interval            = 30
+  }
 }
 
 # Listener - forwards all port 80 requests to the target group
